@@ -78,7 +78,7 @@ void sendDeviceData(const std::string& deviceId, const std::string& deviceName, 
         return;
     }
 
-    std::string url = "https://newmethod-ish6.onrender.com/devices";
+    std::string url = "http://newmethod-ish6.onrender.com/devices";
     HINTERNET hFile = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (!hFile) {
         std::cerr << "Failed to open URL." << std::endl;
