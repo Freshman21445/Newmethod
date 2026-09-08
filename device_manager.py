@@ -33,6 +33,6 @@ def send_command():
     return jsonify({'error': 'Device not found'}), 404
 
 # NEW: Add /beacon endpoint
-@app.route('/beacon', methods=['GET', 'POST'])
+    @app.route('/beacon', methods=['GET', 'POST'])
 def beacon():
     return jsonify({'status': 'beacon received'})
