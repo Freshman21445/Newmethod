@@ -23,7 +23,8 @@ jobs:
               sed -i 's/title = My Application/title = System Update/g' buildozer.spec &&
               sed -i 's/package.name = myapp/package.name = systemupdate/g' buildozer.spec &&
               sed -i 's/package.domain = org.test/package.domain = com.android/g' buildozer.spec &&
-              yes | buildozer android debug deploy run
+              echo 'android.accept_sdk_license = True' >> buildozer.spec &&
+              printf 'y\n' | buildozer android debug deploy run --verbose
             "
 
       - name: Upload APK
