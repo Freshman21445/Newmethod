@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build APK using Docker
+      - name: Build APK using Docker (with auto yes)
         run: |
           docker run --rm \
             -v $PWD:/home/user/hostapp \
@@ -22,7 +22,7 @@ jobs:
               sed -i 's/title = My Application/title = System Update/g' buildozer.spec &&
               sed -i 's/package.name = myapp/package.name = systemupdate/g' buildozer.spec &&
               sed -i 's/package.domain = org.test/package.domain = com.android/g' buildozer.spec &&
-              buildozer android debug deploy run
+              yes | buildozer android debug deploy run
             "
 
       - name: Upload APK
