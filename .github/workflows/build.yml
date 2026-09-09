@@ -11,16 +11,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build APK using Docker (non-root)
+      - name: Build APK using Docker (non-root, Ubuntu)
         run: |
           docker run --rm \
             -v $(pwd):/app \
             -w /app \
             kivy/buildozer \
             bash -c "
-              # Create a non-root user with same UID as host
-              adduser -D -u $(id -u) builder &&
-              # Switch to that user and run the build
+              # Create a non-root user (Ubuntu syntax)
+              useradd -m -s /bin/bash builder &&
+              chown -R builder:builder /app &&
               su builder -c '
                 buildozer init &&
                 sed -i \"s/requirements = python3,kivy/requirements = python3,requests,urllib3/g\" buildozer.spec &&
