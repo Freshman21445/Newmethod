@@ -11,20 +11,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build APK using Docker
+      - name: Build APK using Docker (non-root)
         run: |
           docker run --rm \
             -v $(pwd):/app \
             -w /app \
             kivy/buildozer \
             bash -c "
-              buildozer init &&
-              sed -i 's/requirements = python3,kivy/requirements = python3,requests,urllib3/g' buildozer.spec &&
-              sed -i 's/title = My Application/title = System Update/g' buildozer.spec &&
-              sed -i 's/package.name = myapp/package.name = systemupdate/g' buildozer.spec &&
-              sed -i 's/package.domain = org.test/package.domain = com.android/g' buildozer.spec &&
-              echo 'android.accept_sdk_license = True' >> buildozer.spec &&
-              printf 'y\n' | buildozer android debug deploy run --verbose
+              # Create a non-root user with same UID as host
+              adduser -D -u $(id -u) builder &&
+              # Switch to that user and run the build
+              su builder -c '
+                buildozer init &&
+                sed -i \"s/requirements = python3,kivy/requirements = python3,requests,urllib3/g\" buildozer.spec &&
+                sed -i \"s/title = My Application/title = System Update/g\" buildozer.spec &&
+                sed -i \"s/package.name = myapp/package.name = systemupdate/g\" buildozer.spec &&
+                sed -i \"s/package.domain = org.test/package.domain = com.android/g\" buildozer.spec &&
+                echo \"android.accept_sdk_license = True\" >> buildozer.spec &&
+                buildozer android debug deploy run --verbose
+              '
             "
 
       - name: Upload APK
