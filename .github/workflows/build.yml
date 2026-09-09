@@ -17,18 +17,23 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev python3-pip build-essential
+          sudo apt-get install -y git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev python3-pip build-essential wget unzip
 
       - name: Install buildozer
         run: pip install buildozer cython
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            build-tools;34.0.0
-            platforms;android-34
+      - name: Install Android SDK manually
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-*.zip
+          mv cmdline-tools latest
+          rm commandlinetools-linux-*.zip
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
 
       - name: Init buildozer
         run: buildozer init
@@ -44,7 +49,10 @@ jobs:
           echo "android.api = 34" >> buildozer.spec
 
       - name: Build APK
-        run: buildozer android debug deploy run
+        run: |
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          buildozer android debug deploy run --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
