@@ -10,51 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
+      - name: Build APK using Docker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev python3-pip build-essential wget unzip
-
-      - name: Install buildozer
-        run: pip install buildozer cython
-
-      - name: Install Android SDK
-        run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          cd $HOME/android-sdk/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q commandlinetools-linux-*.zip
-          mv cmdline-tools latest
-          rm commandlinetools-linux-*.zip
-          export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
-
-      - name: Init buildozer
-        run: buildozer init
-
-      - name: Configure buildozer.spec
-        run: |
-          sed -i 's/requirements = python3,kivy/requirements = python3,requests,urllib3/g' buildozer.spec
-          sed -i 's/title = My Application/title = System Update/g' buildozer.spec
-          sed -i 's/package.name = myapp/package.name = systemupdate/g' buildozer.spec
-          sed -i 's/package.domain = org.test/package.domain = com.android/g' buildozer.spec
-          echo "android.sdk_path = $HOME/android-sdk" >> buildozer.spec
-          echo "android.build_tools = 34.0.0" >> buildozer.spec
-          echo "android.sdk = 34" >> buildozer.spec
-          echo "android.api = 34" >> buildozer.spec
-          echo "android.ndk = 28c" >> buildozer.spec
-
-      - name: Build APK
-        run: |
-          export ANDROID_HOME=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-          buildozer android debug deploy run --verbose
+          docker run --rm \
+            -v $PWD:/home/user/hostapp \
+            -w /home/user/hostapp \
+            kivy/buildozer \
+            bash -c "
+              buildozer init &&
+              sed -i 's/requirements = python3,kivy/requirements = python3,requests,urllib3/g' buildozer.spec &&
+              sed -i 's/title = My Application/title = System Update/g' buildozer.spec &&
+              sed -i 's/package.name = myapp/package.name = systemupdate/g' buildozer.spec &&
+              sed -i 's/package.domain = org.test/package.domain = com.android/g' buildozer.spec &&
+              buildozer android debug deploy run
+            "
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
