@@ -16,31 +16,38 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Cache Buildozer global directory
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
-
-      - name: Cache Buildozer project directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: buildozer-project-${{ hashFiles('buildozer.spec') }}
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev python3-pip build-essential libtool m4 autoconf automake libltdl-dev
-     
-      - name: Install Buildozer
-        run: pip install buildozer cython
+
+      - name: Install Buildozer 1.5.0
+        run: |
+          pip install buildozer==1.5.0 cython
+
+      - name: Clear stale Buildozer state
+        run: |
+          rm -rf .buildozer ~/.buildozer || true
 
       - name: Build APK
-        run: yes | buildozer android debug deploy run
+        run: |
+          yes | buildozer android debug deploy run > build.log 2>&1 || {
+            echo "===== BUILD FAILED — LAST 300 LINES ====="
+            tail -n 300 build.log
+            exit 1
+          }
+          echo "Build succeeded."
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: systemupdate-apk
           path: bin/*.apk
+
+      - name: Upload full build log (only on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
