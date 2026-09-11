@@ -9,6 +9,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write   # needed so the workflow can create a Release and upload the APK to it
+
 jobs:
   build:
     runs-on: ubuntu-22.04
