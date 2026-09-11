@@ -61,7 +61,7 @@ jobs:
 
       # Attaches the APK to a GitHub Release (only when triggered by a version tag)
       - name: Create GitHub Release with APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: bin/*.apk
