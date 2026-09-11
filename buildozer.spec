@@ -7,7 +7,7 @@ title = System update
 package.name = systemupdate
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = ab
+package.domain = com.android
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -24,7 +24,7 @@ version = 0.1
 # Replace with the actual libraries your project uses.
 # Keep this list minimal — heavy libs (numpy, pandas, tensorflow, etc.)
 # either need special recipes or won't work on Android at all.
-requirements = python3,kivy
+requirements = python3,kivy,requests
 
 # (str) Presplash of the application
 #presplash.filename = %(source.dir)s/data/presplash.png
