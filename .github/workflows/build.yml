@@ -17,10 +17,7 @@ jobs:
             -v $(pwd):/app \
             -w /app \
             kivy/buildozer \
-            buildozer android debug
-
-      - name: Show output
-        run: ls -la bin/ || echo "no bin folder"
+            android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
