@@ -11,43 +11,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
+      - name: Build APK in Docker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git openjdk-17-jdk zlib1g-dev libffi-dev libssl-dev python3-pip build-essential libtool m4 autoconf automake libltdl-dev
+          docker run --rm \
+            -v $(pwd):/app \
+            -w /app \
+            kivy/buildozer \
+            buildozer android debug
 
-      - name: Install Buildozer 1.5.0
-        run: |
-          pip install buildozer==1.5.0 cython
-
-      - name: Clear stale Buildozer state
-        run: |
-          rm -rf .buildozer ~/.buildozer || true
-
-      - name: Build APK
-        run: |
-          yes | buildozer android debug deploy run > build.log 2>&1 || {
-            echo "===== BUILD FAILED — LAST 300 LINES ====="
-            tail -n 300 build.log
-            exit 1
-          }
-          echo "Build succeeded."
+      - name: Show output
+        run: ls -la bin/ || echo "no bin folder"
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: systemupdate-apk
           path: bin/*.apk
-
-      - name: Upload full build log (only on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
+          if-no-files-found: warn
