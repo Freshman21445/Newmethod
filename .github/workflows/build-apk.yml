@@ -1,0 +1,74 @@
+name: Build APK
+
+# Triggers:
+# - Push a tag like "v1.0" to create a downloadable GitHub Release with the APK
+# - Or trigger manually from the Actions tab (workflow_dispatch)
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed so the workflow can create a Release and upload the APK to it
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool \
+            pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev \
+            cmake libffi-dev libssl-dev
+
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
+
+      - name: Build APK with Buildozer
+        run: |
+          # Run buildozer silently, saving ALL output to a log file
+          set +e
+          buildozer -v android debug > build.log 2>&1
+          EXIT_CODE=$?
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "========== BUILD FAILED - ERRORS =========="
+            # Show only lines that contain errors/exceptions
+            grep -n -E "(ERROR|CRITICAL|Traceback|raise |Exception|error:|No such file|Permission denied|ModuleNotFoundError|SyntaxError|ImportError)" build.log
+            echo ""
+            echo "--- Last 30 lines of log (for context) ---"
+            tail -30 build.log
+            echo "==========================================="
+            exit $EXIT_CODE
+          fi
+
+          echo "Build succeeded - no errors."
+
+      # Uploads the APK as a build artifact (always, every run)
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: bin/*.apk
+
+      # Attaches the APK to a GitHub Release (only when triggered by a version tag)
+      - name: Create GitHub Release with APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
