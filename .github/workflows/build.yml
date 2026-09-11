@@ -24,6 +24,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install system dependencies
         run: |
           sudo apt update
@@ -44,9 +50,14 @@ jobs:
           EXIT_CODE=$?
 
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "========== BUILD FAILED - LAST 300 LINES =========="
-            tail -300 build.log
-            echo "===================================================="
+            echo ""
+            echo "========== BUILD FAILED - ERRORS =========="
+            # Show only lines that contain errors/exceptions
+            grep -n -E "(ERROR|CRITICAL|Traceback|raise |Exception|error:|No such file|Permission denied|ModuleNotFoundError|SyntaxError|ImportError)" build.log
+            echo ""
+            echo "--- Last 30 lines of log (for context) ---"
+            tail -30 build.log
+            echo "==========================================="
             exit $EXIT_CODE
           fi
 
