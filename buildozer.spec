@@ -7,7 +7,7 @@ title = System update
 package.name = systemupdate
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = com.android
+package.domain = ab
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -38,7 +38,7 @@ orientation = portrait
 # (list) Permissions
 # Add any Android permissions your app actually needs, e.g.:
 # android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE
-android.permissions = INTERNET, WRITE_EXTERNA L_STORAGE, READ_EXTERNA L_STORAGE
+android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
 
 # (int) Target Android API, should be as high as possible.
 android.api = 31
