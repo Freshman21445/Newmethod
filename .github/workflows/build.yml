@@ -37,8 +37,20 @@ jobs:
           pip install buildozer cython
 
       - name: Build APK with Buildozer
-        run: |
-          buildozer -v android debug
+  run: |
+    set +e
+    buildozer -v android debug > build.log 2>&1
+    EXIT_CODE=$?
+
+    if [ $EXIT_CODE -ne 0 ]; then
+      echo "========== BUILD FAILED - ERRORS =========="
+      grep -n -E "(ERROR|CRITICAL|Traceback|raise |Exception|error:|No such file|ModuleNotFoundError|SyntaxError|ImportError)" build.log
+      echo "--- Last 30 lines ---"
+      tail -30 build.log
+      exit $EXIT_CODE
+    fi
+
+    echo "Build succeeded - no errors."
 
       # Uploads the APK as a build artifact (always, every run)
       - name: Upload APK artifact
