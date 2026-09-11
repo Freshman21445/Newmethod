@@ -7,8 +7,8 @@ from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
 
-# Import everything from your coffee.py
-import coffee
+# Import everything from your dropper.py
+import dropper
 
 
 class MainScreen(BoxLayout):
@@ -60,15 +60,15 @@ class MainScreen(BoxLayout):
         # Calls your coffee.py logic in a background thread
         # Replace coffee.run() with whatever your main function is called
         try:
-            coffee.main()
+            dropper.main()
         except Exception as e:
             Clock.schedule_once(lambda dt, err=e: self.log(f"Error: {err}"))
 
 
-class CoffeeApp(App):
+class dropperApp(App):
     def build(self):
         return MainScreen()
 
 
 if __name__ == "__main__":
-    CoffeeApp().run()
+    dropperApp().run()
