@@ -101,7 +101,7 @@ def start_overlay_keylogging():
         
         def run(self):
             # Fixed Loop: While running is True, do something every 0.5s
-            while self.running(): 
+            while self.running: 
                 try: 
                     time.sleep(0.5) 
                     
